@@ -68,7 +68,7 @@
     "@types/node": "^16.11.1",
     "@types/superagent": "^4.1.13",
     "@types/superagent-proxy": "^2.0.1",
-    "@types/vscode": "^1.125.0",
+    "@types/vscode": "^1.124.0",
     "@typescript-eslint/eslint-plugin": "^5.0.0",
     "@typescript-eslint/parser": "^5.0.0",
     "bufferutil": "^4.0.5",
