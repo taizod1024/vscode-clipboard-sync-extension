@@ -1,8 +1,8 @@
 {
   "version": "0.0.15",
   "name": "clipboard-sync",
-  "displayName": "Sync Clipboard via GitHub Setting",
-  "description": "",
+  "displayName": "Clipboard Sync Extension",
+  "description": "Sync Clipboard via GitHub Setting",
   "activationEvents": [
     "onStartupFinished"
   ],
