@@ -1,0 +1,1 @@
+# vscode-clipboard-sync-extension
