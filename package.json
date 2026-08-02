@@ -3,6 +3,9 @@
   "name": "clipboard-sync",
   "displayName": "Sync Clipboard via GitHub Setting",
   "description": "",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "engines": {
     "vscode": "^1.124.0"
   },
@@ -20,13 +23,28 @@
     "commands": [
       {
         "command": "clipboard-sync.pushClipboard",
-        "title": "push clipboard"
+        "title": "Clipboard Sync: Push Clipboard"
       },
       {
         "command": "clipboard-sync.pullClipboard",
-        "title": "pull clipboard"
+        "title": "Clipboard Sync: Pull Clipboard"
       }
     ],
+    "configuration": {
+      "title": "Clipboard Sync",
+      "properties": {
+        "clipboard-sync.syncedText": {
+          "type": "string",
+          "default": "",
+          "description": "Clipboard text stored in VS Code settings and synced across signed-in devices."
+        },
+        "clipboard-sync.sender": {
+          "type": "string",
+          "default": "",
+          "description": "Sender identifier used by Clipboard Sync to determine which VS Code instance pushed the latest text."
+        }
+      }
+    },
     "keybindings": []
   },
   "scripts": {

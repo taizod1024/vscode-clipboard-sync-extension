@@ -5,6 +5,10 @@
         "outDir": "build",
         "sourceMap": true,
         "rootDir": "src",
+        "types": [
+            "node",
+            "vscode"
+        ],
         "strict": true, /* enable all strict type-checking options */
         "strictNullChecks": false,
         "esModuleInterop": true,
