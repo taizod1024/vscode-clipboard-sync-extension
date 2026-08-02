@@ -23,11 +23,11 @@
     "commands": [
       {
         "command": "clipboard-sync.pushClipboard",
-        "title": "Clipboard Sync: Push Clipboard"
+        "title": "Clipboard Sync: Push Clipboard to the cloud"
       },
       {
         "command": "clipboard-sync.pullClipboard",
-        "title": "Clipboard Sync: Pull Clipboard"
+        "title": "Clipboard Sync: Pull Clipboard from the cloud"
       }
     ],
     "configuration": {

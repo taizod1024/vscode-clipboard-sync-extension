@@ -54,7 +54,7 @@ class ClipboardSync {
     await this.getConfiguration().update(this.senderKey, sender, vscode.ConfigurationTarget.Global);
     await this.getConfiguration().update(this.syncedTextKey, clipboardText, vscode.ConfigurationTarget.Global);
 
-    this.logAndNotify(`pushed clipboard to synced settings`, byteLength);
+    this.logAndNotify(`pushed clipboard to the cloud`, byteLength);
   }
 
   /** pull clipboard */
@@ -63,7 +63,7 @@ class ClipboardSync {
     const byteLength = this.getByteLength(syncedText);
 
     await vscode.env.clipboard.writeText(syncedText);
-    this.logAndNotify(`pulled synced settings into clipboard`, byteLength);
+    this.logAndNotify(`pulled clipboard from the cloud`, byteLength);
   }
 
   /** get synced text from vscode settings */
@@ -86,7 +86,13 @@ class ClipboardSync {
 
     const pullAction = "Pull";
     const message = syncedText ? `Clipboard Sync: synced clipboard text was updated (${byteLength} bytes). Pull now?` : `Clipboard Sync: synced clipboard text was cleared (${byteLength} bytes). Pull now?`;
-    const selection = await vscode.window.showInformationMessage(message, pullAction);
+    const selection = await vscode.window.showInformationMessage(
+      message,
+      {
+        detail: this.formatPreviewDetail(syncedText),
+      },
+      pullAction,
+    );
 
     if (selection === pullAction) {
       await this.pullClipboard();
@@ -146,26 +152,42 @@ class ClipboardSync {
 
   /** show clipboard actions in a quick pick */
   private async showClipboardActions() {
-    const selection = await vscode.window.showQuickPick(
-      [
-        {
-          label: "$(arrow-up) Push Clipboard",
-          description: "Store the current clipboard in synced VS Code settings",
-          action: () => this.pushClipboard(),
-        },
-        {
-          label: "$(arrow-down) Pull Clipboard",
-          description: "Write the synced VS Code setting into the local clipboard",
-          action: () => this.pullClipboard(),
-        },
-      ],
-      {
-        title: "Clipboard Sync",
-        placeHolder: "Select a clipboard sync action",
-      },
-    );
+    const clipboardText = await vscode.env.clipboard.readText();
+    const syncedText = this.getSyncedText();
 
-    if (!selection) {
+    type ClipboardActionItem = vscode.QuickPickItem & {
+      action?: () => Promise<void>;
+    };
+
+    const items: ClipboardActionItem[] = [
+      {
+        label: "$(arrow-up) Push Clipboard to the cloud",
+        detail: this.formatPreviewDetail('"' + clipboardText + '"'),
+        action: () => this.pushClipboard(),
+      },
+      {
+        label: "$(arrow-down) Pull Clipboard from the cloud",
+        detail: this.formatPreviewDetail('"' + syncedText + '"'),
+        action: () => this.pullClipboard(),
+      },
+      {
+        label: "",
+        kind: vscode.QuickPickItemKind.Separator,
+      },
+      {
+        label: "$(gear) Settings",
+        action: async () => {
+          await vscode.commands.executeCommand("workbench.action.openSettings", "clipboardsync.");
+        },
+      },
+    ];
+
+    const selection = await vscode.window.showQuickPick(items, {
+      title: "Clipboard Sync",
+      placeHolder: "Select a clipboard sync action",
+    });
+
+    if (!selection?.action) {
       return;
     }
 
@@ -210,6 +232,18 @@ class ClipboardSync {
   private logAndNotify(message: string, byteLength: number) {
     this.channel.appendLine(`clipboard ${message} (${byteLength} bytes)`);
     void vscode.window.showInformationMessage(`Clipboard Sync: ${message} (${byteLength} bytes).`);
+  }
+
+  /** get first line from text for compact previews */
+  private getFirstLine(text: string): string {
+    const [firstLine = ""] = text.trim().split(/\r?\n/, 1);
+    return firstLine;
+  }
+
+  /** format quick pick and notification detail with first-line preview */
+  private formatPreviewDetail(text: string): string {
+    const firstLine = this.getFirstLine(text);
+    return firstLine || "(empty)";
   }
 }
 export const clipboardSync = new ClipboardSync();
