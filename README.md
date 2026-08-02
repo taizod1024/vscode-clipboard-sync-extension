@@ -1,1 +1,3 @@
-# vscode-clipboard-sync-extension
+# Clipboard Sync
+
+Sync Clipboard via GitHub Setting
