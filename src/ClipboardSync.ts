@@ -54,7 +54,7 @@ class ClipboardSync {
     await this.getConfiguration().update(this.senderKey, sender, vscode.ConfigurationTarget.Global);
     await this.getConfiguration().update(this.syncedTextKey, clipboardText, vscode.ConfigurationTarget.Global);
 
-    this.logAndNotify(`pushed clipboard to synced settings`, byteLength);
+    this.logAndNotify(`pushed clipboard to the cloud`, byteLength);
   }
 
   /** pull clipboard */
@@ -63,7 +63,7 @@ class ClipboardSync {
     const byteLength = this.getByteLength(syncedText);
 
     await vscode.env.clipboard.writeText(syncedText);
-    this.logAndNotify(`pulled synced settings into clipboard`, byteLength);
+    this.logAndNotify(`pulled clipboard from the cloud`, byteLength);
   }
 
   /** get synced text from vscode settings */
