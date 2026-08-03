@@ -5,8 +5,11 @@ class ClipboardSync {
   /** application id for vscode */
   private readonly appId = "clipboard-sync";
 
-  /** setting key for synced clipboard text */
-  private readonly syncedTextKey = "syncedText";
+  /** setting key for clipboard text */
+  private readonly textKey = "text";
+
+  /** legacy setting key for clipboard text */
+  private readonly legacyTextKey = "syncedText";
 
   /** setting key for sender id */
   private readonly senderKey = "sender";
@@ -14,14 +17,8 @@ class ClipboardSync {
   /** application name */
   private readonly appName = "Clipboard Sync";
 
-  /** push clipboard command id */
-  private readonly pushClipboardCommand = `${this.appId}.pushClipboard`;
-
-  /** pull clipboard command id */
-  private readonly pullClipboardCommand = `${this.appId}.pullClipboard`;
-
-  /** status bar quick pick command id */
-  private readonly showClipboardActionsCommand = `${this.appId}.showClipboardActions`;
+  /** status bar sync command id */
+  private readonly syncClipboardCommand = `${this.appId}.syncClipboard`;
 
   /** channel on vscode */
   private channel: vscode.LogOutputChannel;
@@ -42,7 +39,6 @@ class ClipboardSync {
     this.initializeOutputChannel();
     this.registerStatusBarItems();
     this.registerCommands();
-    this.registerConfigurationWatcher();
   }
 
   /** push clipboard */
@@ -51,10 +47,13 @@ class ClipboardSync {
     const byteLength = this.getByteLength(clipboardText);
     const sender = this.getLocalSender();
 
-    await this.getConfiguration().update(this.senderKey, sender, vscode.ConfigurationTarget.Global);
-    await this.getConfiguration().update(this.syncedTextKey, clipboardText, vscode.ConfigurationTarget.Global);
+    const configuration = this.getConfiguration();
 
-    this.logAndNotify(`pushed clipboard to the cloud`, byteLength);
+    await configuration.update(this.senderKey, sender, vscode.ConfigurationTarget.Global);
+    await configuration.update(this.textKey, clipboardText, vscode.ConfigurationTarget.Global);
+    await configuration.update(this.legacyTextKey, undefined, vscode.ConfigurationTarget.Global);
+
+    this.logAndNotify(`pushed clipboard to the cloud`, byteLength, clipboardText);
   }
 
   /** pull clipboard */
@@ -63,12 +62,13 @@ class ClipboardSync {
     const byteLength = this.getByteLength(syncedText);
 
     await vscode.env.clipboard.writeText(syncedText);
-    this.logAndNotify(`pulled clipboard from the cloud`, byteLength);
+    this.logAndNotify(`pulled clipboard from the cloud`, byteLength, syncedText);
   }
 
   /** get synced text from vscode settings */
   private getSyncedText(): string {
-    return this.getConfiguration().get<string>(this.syncedTextKey, "");
+    const configuration = this.getConfiguration();
+    return configuration.get<string>(this.textKey, configuration.get<string>(this.legacyTextKey, ""));
   }
 
   /** handle synced setting updates */
@@ -84,17 +84,11 @@ class ClipboardSync {
 
     this.channel.appendLine(`synced clipboard setting updated (${byteLength} bytes)`);
 
-    const pullAction = "Pull";
-    const message = syncedText ? `Clipboard Sync: synced clipboard text was updated (${byteLength} bytes). Pull now?` : `Clipboard Sync: synced clipboard text was cleared (${byteLength} bytes). Pull now?`;
-    const selection = await vscode.window.showInformationMessage(
-      message,
-      {
-        detail: this.formatPreviewDetail(syncedText),
-      },
-      pullAction,
-    );
+    const preview = this.formatPreviewDetail(syncedText);
+    const message = preview ? `Clipboard Sync: update clipboard?\n${preview}` : "Clipboard Sync: update clipboard?";
+    const selection = await vscode.window.showInformationMessage(message, "Update");
 
-    if (selection === pullAction) {
+    if (selection === "Update") {
       await this.pullClipboard();
     }
   }
@@ -136,75 +130,66 @@ class ClipboardSync {
 
   /** register status bar items */
   private registerStatusBarItems() {
-    this.statusBarItem = this.createStatusBarItem(100, "Clipboard Sync", "Clipboard Sync actions", this.showClipboardActionsCommand);
+    this.statusBarItem = this.createStatusBarItem(100, "Clipboard Sync", "Click to sync clipboard", this.syncClipboardCommand);
 
     this.context.subscriptions.push(this.statusBarItem);
   }
 
   /** register commands */
   private registerCommands() {
-    this.context.subscriptions.push(
-      vscode.commands.registerCommand(this.showClipboardActionsCommand, async () => this.executeCommand(() => this.showClipboardActions())),
-      vscode.commands.registerCommand(this.pushClipboardCommand, async () => this.executeCommand(() => this.pushClipboard())),
-      vscode.commands.registerCommand(this.pullClipboardCommand, async () => this.executeCommand(() => this.pullClipboard())),
-    );
+    this.context.subscriptions.push(vscode.commands.registerCommand(this.syncClipboardCommand, async () => this.executeCommand(() => this.handleStatusBarClick())));
   }
 
-  /** show clipboard actions in a quick pick */
-  private async showClipboardActions() {
-    const clipboardText = await vscode.env.clipboard.readText();
+  /** handle status bar click with the new sync flow */
+  private async handleStatusBarClick() {
+    await this.runSettingsSync();
+
     const syncedText = this.getSyncedText();
+    const sender = this.getSyncedSender();
+    const localSender = this.getLocalSender();
 
-    type ClipboardActionItem = vscode.QuickPickItem & {
-      action?: () => Promise<void>;
-    };
-
-    const items: ClipboardActionItem[] = [
-      {
-        label: "$(arrow-up) Push Clipboard to the cloud",
-        detail: this.formatPreviewDetail('"' + clipboardText + '"'),
-        action: () => this.pushClipboard(),
-      },
-      {
-        label: "$(arrow-down) Pull Clipboard from the cloud",
-        detail: this.formatPreviewDetail('"' + syncedText + '"'),
-        action: () => this.pullClipboard(),
-      },
-      {
-        label: "",
-        kind: vscode.QuickPickItemKind.Separator,
-      },
-      {
-        label: "$(gear) Settings",
-        action: async () => {
-          await vscode.commands.executeCommand("workbench.action.openSettings", "clipboardsync.");
-        },
-      },
-    ];
-
-    const selection = await vscode.window.showQuickPick(items, {
-      title: "Clipboard Sync",
-      placeHolder: "Select a clipboard sync action",
-    });
-
-    if (!selection?.action) {
+    if (!syncedText || !sender || sender === localSender) {
+      await this.pushClipboard();
       return;
     }
 
-    await selection.action();
+    const preview = this.formatPreviewDetail(syncedText);
+    const message = `Clipboard Sync: synced text available - ${preview}`;
+    const selection = await vscode.window.showInformationMessage(message, "Pull", "Push", "Cancel");
+
+    if (selection === "Pull") {
+      await this.pullSyncedText(syncedText);
+      return;
+    }
+
+    if (selection === "Push") {
+      await this.pushClipboard();
+    }
   }
 
-  /** watch synced setting changes */
-  private registerConfigurationWatcher() {
-    this.context.subscriptions.push(
-      vscode.workspace.onDidChangeConfiguration(event => {
-        if (!event.affectsConfiguration(`${this.appId}.${this.syncedTextKey}`)) {
-          return;
-        }
+  /** import the synced clipboard text into the local clipboard */
+  private async pullSyncedText(syncedText: string) {
+    await vscode.env.clipboard.writeText(syncedText);
 
-        void this.handleSyncedSettingChange();
-      }),
-    );
+    const configuration = this.getConfiguration();
+    await configuration.update(this.senderKey, this.getLocalSender(), vscode.ConfigurationTarget.Global);
+
+    const byteLength = this.getByteLength(syncedText);
+    this.logAndNotify(`pulled clipboard from the cloud`, byteLength, syncedText);
+  }
+
+  /** trigger VS Code settings sync before applying local/remote clipboard logic */
+  private async runSettingsSync() {
+    const candidates = ["workbench.action.sync", "workbench.userDataSync.actions.syncNow", "workbench.userDataSync.actions.turnOn"];
+
+    for (const commandId of candidates) {
+      try {
+        await vscode.commands.executeCommand(commandId);
+        return;
+      } catch {
+        // ignore unsupported command ids and continue to the next candidate
+      }
+    }
   }
 
   /** create a status bar item for an extension command */
@@ -229,21 +214,35 @@ class ClipboardSync {
   }
 
   /** show a consistent operation log and notification */
-  private logAndNotify(message: string, byteLength: number) {
-    this.channel.appendLine(`clipboard ${message} (${byteLength} bytes)`);
+  private logAndNotify(message: string, byteLength: number, text?: string) {
+    const preview = this.formatPreviewDetail(text ?? "");
+    this.channel.appendLine(`clipboard ${message} (${byteLength} bytes): ${preview}`);
     void vscode.window.showInformationMessage(`Clipboard Sync: ${message} (${byteLength} bytes).`);
   }
 
   /** get first line from text for compact previews */
   private getFirstLine(text: string): string {
-    const [firstLine = ""] = text.trim().split(/\r?\n/, 1);
-    return firstLine;
+    const normalized = text.replace(/\r\n/g, "\n");
+    const [firstLine = ""] = normalized.split(/\n/, 1);
+    return firstLine.trim();
   }
 
-  /** format quick pick and notification detail with first-line preview */
+  /** format notification detail with a readable preview */
   private formatPreviewDetail(text: string): string {
+    if (!text) {
+      return "(empty)";
+    }
+
     const firstLine = this.getFirstLine(text);
-    return firstLine || "(empty)";
+    if (!firstLine) {
+      return "(empty)";
+    }
+
+    if (firstLine.length <= 120) {
+      return firstLine;
+    }
+
+    return `${firstLine.slice(0, 117)}...`;
   }
 }
 export const clipboardSync = new ClipboardSync();

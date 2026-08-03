@@ -20,20 +20,11 @@
   "publisher": "taizod1024",
   "main": "./build/main.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "clipboard-sync.pushClipboard",
-        "title": "Clipboard Sync: Push Clipboard to the cloud"
-      },
-      {
-        "command": "clipboard-sync.pullClipboard",
-        "title": "Clipboard Sync: Pull Clipboard from the cloud"
-      }
-    ],
+    "commands": [],
     "configuration": {
       "title": "Clipboard Sync",
       "properties": {
-        "clipboard-sync.syncedText": {
+        "clipboard-sync.text": {
           "type": "string",
           "default": "",
           "description": "Clipboard text stored in VS Code settings and synced across signed-in devices."

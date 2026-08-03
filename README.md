@@ -25,7 +25,7 @@ Sync clipboard text across signed-in VS Code instances by storing it in a synced
 
 ## Synced Settings
 
-- `clipboard-sync.syncedText`
+- `clipboard-sync.text`
 - `clipboard-sync.sender`
 
 These settings are stored in user settings, so VS Code Settings Sync can propagate them to your other signed-in machines.
