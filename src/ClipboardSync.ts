@@ -106,7 +106,7 @@ class ClipboardSync {
 
   /** register commands */
   private registerCommands() {
-    this.context.subscriptions.push(vscode.commands.registerCommand(this.syncClipboardCommand, async () => this.executeCommand(() => this.handleStatusBarClick())));
+    this.context.subscriptions.push(vscode.commands.registerCommand(this.syncClipboardCommand, async () => await this.executeCommand(() => this.handleStatusBarClick())));
   }
 
   /** handle status bar click with the new sync flow */
@@ -130,10 +130,7 @@ class ClipboardSync {
     if (selection === "Pull") {
       await this.pullSyncedText(syncedText);
       await this.runSettingsSync();
-      return;
-    }
-
-    if (selection === "Push") {
+    } else if (selection === "Push") {
       await this.pushClipboard();
       await this.runSettingsSync();
     }
