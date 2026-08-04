@@ -1,5 +1,5 @@
 {
-  "version": "0.0.15",
+  "version": "0.0.7",
   "name": "clipboard-sync",
   "displayName": "Clipboard Sync Extension",
   "description": "Sync Clipboard via GitHub Setting",
