@@ -53,44 +53,13 @@ class ClipboardSync {
     await configuration.update(this.textKey, clipboardText, vscode.ConfigurationTarget.Global);
     await configuration.update(this.legacyTextKey, undefined, vscode.ConfigurationTarget.Global);
 
-    this.logAndNotify(`pushed clipboard to the cloud`, byteLength, clipboardText);
-  }
-
-  /** pull clipboard */
-  private async pullClipboard() {
-    const syncedText = this.getSyncedText();
-    const byteLength = this.getByteLength(syncedText);
-
-    await vscode.env.clipboard.writeText(syncedText);
-    this.logAndNotify(`pulled clipboard from the cloud`, byteLength, syncedText);
+    this.logAndNotify(`pushed to the cloud`, byteLength, clipboardText);
   }
 
   /** get synced text from vscode settings */
   private getSyncedText(): string {
     const configuration = this.getConfiguration();
     return configuration.get<string>(this.textKey, configuration.get<string>(this.legacyTextKey, ""));
-  }
-
-  /** handle synced setting updates */
-  private async handleSyncedSettingChange() {
-    const syncedText = this.getSyncedText();
-    const sender = this.getSyncedSender();
-    const byteLength = this.getByteLength(syncedText);
-
-    if (this.isLocalUpdate(sender)) {
-      this.channel.appendLine("suppressed notification for local clipboard sync update");
-      return;
-    }
-
-    this.channel.appendLine(`synced clipboard setting updated (${byteLength} bytes)`);
-
-    const preview = this.formatPreviewDetail(syncedText);
-    const message = preview ? `Clipboard Sync: update clipboard?\n${preview}` : "Clipboard Sync: update clipboard?";
-    const selection = await vscode.window.showInformationMessage(message, "Update");
-
-    if (selection === "Update") {
-      await this.pullClipboard();
-    }
   }
 
   /** determine whether the setting change was initiated locally */
@@ -130,7 +99,7 @@ class ClipboardSync {
 
   /** register status bar items */
   private registerStatusBarItems() {
-    this.statusBarItem = this.createStatusBarItem(100, "Clipboard Sync", "Click to sync clipboard", this.syncClipboardCommand);
+    this.statusBarItem = this.createStatusBarItem(100, "$(clippy) Clipboard Sync", "Click to sync clipboard", this.syncClipboardCommand);
 
     this.context.subscriptions.push(this.statusBarItem);
   }
@@ -150,6 +119,7 @@ class ClipboardSync {
 
     if (!syncedText || !sender || sender === localSender) {
       await this.pushClipboard();
+      await this.runSettingsSync();
       return;
     }
 
@@ -159,11 +129,13 @@ class ClipboardSync {
 
     if (selection === "Pull") {
       await this.pullSyncedText(syncedText);
+      await this.runSettingsSync();
       return;
     }
 
     if (selection === "Push") {
       await this.pushClipboard();
+      await this.runSettingsSync();
     }
   }
 
@@ -175,7 +147,7 @@ class ClipboardSync {
     await configuration.update(this.senderKey, this.getLocalSender(), vscode.ConfigurationTarget.Global);
 
     const byteLength = this.getByteLength(syncedText);
-    this.logAndNotify(`pulled clipboard from the cloud`, byteLength, syncedText);
+    this.logAndNotify(`pulled from the cloud`, byteLength, syncedText);
   }
 
   /** trigger VS Code settings sync before applying local/remote clipboard logic */
@@ -217,7 +189,7 @@ class ClipboardSync {
   private logAndNotify(message: string, byteLength: number, text?: string) {
     const preview = this.formatPreviewDetail(text ?? "");
     this.channel.appendLine(`clipboard ${message} (${byteLength} bytes): ${preview}`);
-    void vscode.window.showInformationMessage(`Clipboard Sync: ${message} (${byteLength} bytes).`);
+    void vscode.window.showInformationMessage(`Clipboard Sync: ${message} - ${preview}`);
   }
 
   /** get first line from text for compact previews */
