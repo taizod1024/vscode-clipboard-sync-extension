@@ -1,15 +1,12 @@
 import * as vscode from "vscode";
 
-/** clipboard-sync-extesnion class */
+/** clipboard-sync-extension class */
 class ClipboardSync {
   /** application id for vscode */
   private readonly appId = "clipboard-sync";
 
   /** setting key for clipboard text */
   private readonly textKey = "text";
-
-  /** legacy setting key for clipboard text */
-  private readonly legacyTextKey = "syncedText";
 
   /** setting key for sender id */
   private readonly senderKey = "sender";
@@ -39,6 +36,7 @@ class ClipboardSync {
     this.initializeOutputChannel();
     this.registerStatusBarItems();
     this.registerCommands();
+    this.watchConfigurationChanges();
   }
 
   /** push clipboard */
@@ -51,7 +49,6 @@ class ClipboardSync {
 
     await configuration.update(this.senderKey, sender, vscode.ConfigurationTarget.Global);
     await configuration.update(this.textKey, clipboardText, vscode.ConfigurationTarget.Global);
-    await configuration.update(this.legacyTextKey, undefined, vscode.ConfigurationTarget.Global);
 
     this.logAndNotify(`pushed to the cloud`, byteLength, clipboardText);
   }
@@ -59,16 +56,7 @@ class ClipboardSync {
   /** get synced text from vscode settings */
   private getSyncedText(): string {
     const configuration = this.getConfiguration();
-    return configuration.get<string>(this.textKey, configuration.get<string>(this.legacyTextKey, ""));
-  }
-
-  /** determine whether the setting change was initiated locally */
-  private isLocalUpdate(sender: string): boolean {
-    if (!sender) {
-      return false;
-    }
-
-    return sender === this.getLocalSender();
+    return configuration.get<string>(this.textKey, "");
   }
 
   /** get utf-8 byte length for display */
@@ -107,6 +95,40 @@ class ClipboardSync {
   /** register commands */
   private registerCommands() {
     this.context.subscriptions.push(vscode.commands.registerCommand(this.syncClipboardCommand, async () => await this.executeCommand(() => this.handleStatusBarClick())));
+  }
+
+  /** track whether we're currently handling a config change to avoid race conditions */
+  private isHandlingConfigChange = false;
+
+  /** watch configuration changes and prompt pull if from remote */
+  private watchConfigurationChanges() {
+    this.context.subscriptions.push(
+      vscode.workspace.onDidChangeConfiguration(async event => {
+        if (!event.affectsConfiguration(this.appId) || this.isHandlingConfigChange) {
+          return;
+        }
+
+        const syncedText = this.getSyncedText();
+        const sender = this.getSyncedSender();
+        const localSender = this.getLocalSender();
+
+        // Only prompt if text exists and is from remote
+        if (syncedText && sender && sender !== localSender) {
+          this.isHandlingConfigChange = true;
+          try {
+            const preview = this.formatPreviewDetail(syncedText);
+            const message = `Clipboard Sync: synced text available - ${preview}`;
+            const selection = await vscode.window.showInformationMessage(message, "Pull", "Cancel");
+
+            if (selection === "Pull") {
+              await this.pullSyncedText(syncedText);
+            }
+          } finally {
+            this.isHandlingConfigChange = false;
+          }
+        }
+      }),
+    );
   }
 
   /** handle status bar click with the new sync flow */
@@ -154,6 +176,8 @@ class ClipboardSync {
     for (const commandId of candidates) {
       try {
         await vscode.commands.executeCommand(commandId);
+        // wait for settings sync to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
         return;
       } catch {
         // ignore unsupported command ids and continue to the next candidate
