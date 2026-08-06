@@ -4,12 +4,14 @@ Sync clipboard text across signed-in VS Code instances by storing it in a synced
 
 ## Features
 
-- Show a single status bar entry (`clipboard Sync`) and open a Quick Pick for actions.
-- Push the current clipboard text into `clipboard-sync.syncedText`.
-- Save sender identity in `clipboard-sync.sender` to detect who pushed the update.
-- When synced text is updated by another sender, show a confirmation dialog to pull now.
+- Show a single status bar entry (`Clipboard Sync`) for quick sync actions.
+- Push the current clipboard text into `clipboard-sync.text`.
+- Save sender identity in `clipboard-sync.sender` to track which machine pushed the update.
+- **Automatic detection**: When synced text is updated by another machine, automatically show a confirmation dialog with `Pull` and `Cancel` options.
+- **Manual sync**: Click the status bar button to manually decide between `Pull`, `Push`, or `Cancel` (includes local vs remote logic).
 - Pull synced text back into local clipboard on demand.
 - Show byte length in operation notifications.
+- Ensure VS Code Settings Sync completes before applying clipboard logic (1-second wait).
 
 ## Commands
 
@@ -18,14 +20,29 @@ Sync clipboard text across signed-in VS Code instances by storing it in a synced
 
 ## Usage
 
-1. Click `clipboard Sync` in the status bar.
-2. Select `Push Clipboard` to upload your current clipboard text.
-3. On another machine (or window), when an external sender updates the text, choose `Pull` in the confirmation dialog.
-4. You can also run `Clipboard Sync: Pull Clipboard` manually from the Command Palette.
+### Automatic Sync (Background)
+
+When another machine updates the synced clipboard text, you'll automatically see a confirmation dialog:
+
+- Select `Pull` to import the synced text into your local clipboard.
+- Select `Cancel` to dismiss the dialog and keep your current clipboard.
+
+### Manual Sync (Status Bar Click)
+
+1. Click `Clipboard Sync` in the status bar.
+2. Choose one of the following:
+   - **Push**: Upload your current clipboard text to sync across machines.
+   - **Pull**: Download and import synced text from another machine.
+   - **Cancel**: Dismiss the dialog.
+3. After any action, Settings Sync is triggered to ensure your changes propagate immediately.
+
+### Alternative: Command Palette
+
+You can also trigger actions from the Command Palette (Ctrl+Shift+P / Cmd+Shift+P).
 
 ## Synced Settings
 
-- `clipboard-sync.text`
-- `clipboard-sync.sender`
+- `clipboard-sync.text` - The synchronized clipboard text across machines.
+- `clipboard-sync.sender` - Machine ID of the sender (used to track ownership).
 
-These settings are stored in user settings, so VS Code Settings Sync can propagate them to your other signed-in machines.
+These settings are stored in user settings and propagated across your signed-in VS Code instances via Settings Sync.
