@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.10](https://github.com/taizod1024/vscode-clipboard-sync-extension/compare/v0.0.9...v0.0.10) (2026-08-06)
+
+
+### Features
+
+* 自動検出 ([8c35359](https://github.com/taizod1024/vscode-clipboard-sync-extension/commit/8c35359667881b4607c51fe9a3dfe833061d8cfc))
+
 ### [0.0.9](https://github.com/taizod1024/vscode-clipboard-sync-extension/compare/v0.0.8...v0.0.9) (2026-08-04)
 
 
