@@ -100,7 +100,7 @@ class ClipboardSync {
   /** track whether we're currently handling a config change to avoid race conditions */
   private isHandlingConfigChange = false;
 
-  /** watch configuration changes and prompt pull if from remote */
+  /** watch configuration changes and trigger sync dialog if from remote */
   private watchConfigurationChanges() {
     this.context.subscriptions.push(
       vscode.workspace.onDidChangeConfiguration(async event => {
@@ -112,17 +112,11 @@ class ClipboardSync {
         const sender = this.getSyncedSender();
         const localSender = this.getLocalSender();
 
-        // Only prompt if text exists and is from remote
+        // Only trigger if text exists and is from remote
         if (syncedText && sender && sender !== localSender) {
           this.isHandlingConfigChange = true;
           try {
-            const preview = this.formatPreviewDetail(syncedText);
-            const message = `Clipboard Sync: synced text available - ${preview}`;
-            const selection = await vscode.window.showInformationMessage(message, "Pull", "Cancel");
-
-            if (selection === "Pull") {
-              await this.pullSyncedText(syncedText);
-            }
+            await this.showSyncDialog();
           } finally {
             this.isHandlingConfigChange = false;
           }
@@ -133,8 +127,17 @@ class ClipboardSync {
 
   /** handle status bar click with the new sync flow */
   private async handleStatusBarClick() {
-    await this.runSettingsSync();
+    this.isHandlingConfigChange = true;
+    try {
+      await this.runSettingsSync();
+      await this.showSyncDialog();
+    } finally {
+      this.isHandlingConfigChange = false;
+    }
+  }
 
+  /** show sync dialog and handle user choice */
+  private async showSyncDialog() {
     const syncedText = this.getSyncedText();
     const sender = this.getSyncedSender();
     const localSender = this.getLocalSender();
